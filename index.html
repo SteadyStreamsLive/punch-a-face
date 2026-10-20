@@ -40,7 +40,8 @@ canvas{display:block;width:100%;height:100%}
 .btn:focus-visible{outline:3px solid var(--cream);outline-offset:2px}
 .hint{color:var(--mute);font-size:13px;flex:1;min-width:180px}
 #file{display:none}
-#drop{position:absolute;inset:0;display:grid;place-items:center;background:rgba(13,11,31,.8);font-family:var(--display);font-size:24px;color:var(--gold)}
+[hidden]{display:none!important}
+#drop{pointer-events:none;position:absolute;inset:0;display:grid;place-items:center;background:rgba(13,11,31,.8);font-family:var(--display);font-size:24px;color:var(--gold)}
 @media (max-width:520px){.hint{display:none}.btn{flex:1}}
 </style>
 </head>
@@ -98,7 +99,7 @@ let hasPhoto=false;
 function loadFile(f){
   if(!f||!f.type.startsWith('image/'))return;
   const url=URL.createObjectURL(f);const img=new Image();
-  img.onload=()=>{const s=Math.min(img.width,img.height);fctx.clearRect(0,0,FS,FS);
+  img.onload=()=>{drop.hidden=true;const s=Math.min(img.width,img.height);fctx.clearRect(0,0,FS,FS);
     fctx.save();fctx.beginPath();fctx.ellipse(256,256,248,256,0,0,7);fctx.clip();
     fctx.drawImage(img,(img.width-s)/2,(img.height-s)/2,s,s,0,0,FS,FS);fctx.restore();
     hasPhoto=true;heal();URL.revokeObjectURL(url)};
@@ -108,7 +109,7 @@ document.getElementById('file').onchange=e=>loadFile(e.target.files[0]);
 document.getElementById('loadBtn').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();document.getElementById('file').click()}};
 const drop=document.getElementById('drop');
 stage.addEventListener('dragover',e=>{e.preventDefault();drop.hidden=false});
-stage.addEventListener('dragleave',()=>drop.hidden=true);
+stage.addEventListener('dragleave',e=>{if(!stage.contains(e.relatedTarget))drop.hidden=true});
 stage.addEventListener('drop',e=>{e.preventDefault();drop.hidden=true;loadFile(e.dataTransfer.files[0])});
 window.addEventListener('paste',e=>{for(const it of e.clipboardData.items){if(it.type.startsWith('image/')){loadFile(it.getAsFile());break}}});
 
