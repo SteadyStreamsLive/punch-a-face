@@ -113,6 +113,21 @@ stage.addEventListener('dragleave',e=>{if(!stage.contains(e.relatedTarget))drop.
 stage.addEventListener('drop',e=>{e.preventDefault();drop.hidden=true;loadFile(e.dataTransfer.files[0])});
 window.addEventListener('paste',e=>{for(const it of e.clipboardData.items){if(it.type.startsWith('image/')){loadFile(it.getAsFile());break}}});
 
+// ---------- sayings (edit this list) ----------
+const SAYINGS=[
+  "Can I get uhhhhhh",
+  "2 SHOT",
+  "Go Back, Go Back",
+  "Can you hear me?!",
+  "Back On",
+  "I don't know what that means"
+];
+let bubble=null,lastSay=0,sayIdx=-1;
+function say(){
+  if(!SAYINGS.length)return;
+  let i;do{i=Math.random()*SAYINGS.length|0}while(SAYINGS.length>1&&i===sayIdx);
+  sayIdx=i;bubble={txt:SAYINGS[i],t:0,life:2.6};lastSay=performance.now();
+}
 // ---------- state ----------
 const S={ox:0,oy:0,vx:0,vy:0,rot:0,vr:0,sq:0,vsq:0,dent:0,vdent:0,dentY:0,dentDir:1,shake:0};
 let bruises=[],fx=[],gloves=[],punches=0,combo=0,best=0,lastHit=0,hand=1,mouse={x:-99,y:-99,in:false};
@@ -159,6 +174,7 @@ function land(g){
   fx.push({type:'text',x:g.tx,y:g.ty-30,t:0,txt:combo>=8?'KNOCKOUT!':words[Math.random()*words.length|0],col:combo>=8?'#e63946':'#ffc93c',big:combo>=8});
   for(let i=0;i<12;i++){const a=Math.random()*7,sp=200+Math.random()*350;fx.push({type:'star',x:g.tx,y:g.ty,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,t:0,c:Math.random()<.5?'#ffc93c':'#fdf3e1'})}
   thump(power,false);upd();
+  if((!bubble||bubble.t>1.2)&&Math.random()<.45)say();
 }
 
 function pt(e){const r=stage.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}}
@@ -222,6 +238,30 @@ function drawFace(){
     for(let k=0;k<4;k++){const a=t+k*Math.PI/2;star(Math.cos(a)*r.s*.35,-r.s*.55+Math.sin(a)*r.s*.06,9,'#ffc93c')}}
   ctx.restore();
 }
+function drawBubble(){
+  if(!bubble)return;const r=faceRect();
+  const fs=Math.max(14,Math.min(22,Math.min(W,H)*.04));
+  ctx.font=`700 ${fs}px Rubik, system-ui, sans-serif`;
+  const maxW=Math.min(W*.42,280),words=bubble.txt.split(' '),lines=[];let line='';
+  for(const w of words){const t=line?line+' '+w:w;if(ctx.measureText(t).width>maxW&&line){lines.push(line);line=w}else line=t}
+  lines.push(line);
+  const lh=fs*1.25,pad=fs*.7,bw=Math.max(...lines.map(l=>ctx.measureText(l).width))+pad*2,bh=lines.length*lh+pad*1.6;
+  const mx=r.x+r.s/2+S.ox+r.s*.12,my=r.y+r.s*.7+S.oy;
+  let bx=Math.min(W-bw-12,r.x+r.s*.78+S.ox),by=Math.max(12,r.y+r.s*.02+S.oy);
+  if(bx<12)bx=12;
+  const p=Math.min(1,bubble.t*7),sc=p<1?.6+.4*(1-Math.pow(1-p,3))*1.05:1;
+  const fade=Math.min(1,(bubble.life-bubble.t)*4);
+  ctx.save();ctx.globalAlpha=fade;
+  ctx.translate(bx+bw*.2,by+bh);ctx.scale(sc,sc);ctx.translate(-(bx+bw*.2),-(by+bh));
+  ctx.fillStyle='#fdf3e1';ctx.strokeStyle='#0d0b1f';ctx.lineWidth=4;
+  ctx.beginPath();ctx.roundRect(bx,by,bw,bh,fs*.8);ctx.fill();ctx.stroke();
+  const tx=bx+Math.min(bw*.25,40);
+  ctx.beginPath();ctx.moveTo(tx,by+bh-2);ctx.lineTo(tx+fs,by+bh-2);ctx.lineTo(mx+(tx-mx)*.35,my+(by+bh-my)*.35);ctx.closePath();ctx.fill();
+  ctx.beginPath();ctx.moveTo(tx,by+bh);ctx.lineTo(mx+(tx-mx)*.35,my+(by+bh-my)*.35);ctx.lineTo(tx+fs,by+bh);ctx.stroke();
+  ctx.fillStyle='#0d0b1f';ctx.textAlign='left';ctx.textBaseline='middle';
+  lines.forEach((l,i)=>ctx.fillText(l,bx+pad,by+pad*.8+lh*i+lh/2));
+  ctx.restore();
+}
 function star(x,y,s,c){ctx.fillStyle=c;ctx.beginPath();for(let i=0;i<10;i++){const a=i*Math.PI/5-Math.PI/2,rr=i%2?s*.45:s;ctx.lineTo(x+Math.cos(a)*rr,y+Math.sin(a)*rr)}ctx.fill()}
 
 function step(dt){
@@ -235,12 +275,14 @@ function step(dt){
   S.shake*=Math.pow(.02,dt);
   for(const b of bruises)b.a=Math.max(.18,b.a-dt*.01);
   if(combo&&performance.now()-lastHit>1200){combo=0;upd()}
+  if(bubble){bubble.t+=dt;if(bubble.t>bubble.life)bubble=null}
+  const nowT=performance.now();if(!bubble&&nowT-lastSay>6000&&nowT-lastHit>3000)say();
 }
 
 let last=performance.now();
 function frame(now){
   const dt=Math.min(.033,(now-last)/1000);last=now;step(dt);
-  drawRing();drawFace();
+  drawRing();drawFace();drawBubble();
   // effects
   fx=fx.filter(f=>{f.t+=dt;
     if(f.type==='star'){f.x+=f.vx*dt;f.y+=f.vy*dt;f.vx*=.9;f.vy*=.9;ctx.globalAlpha=Math.max(0,1-f.t*2.2);star(f.x,f.y,7,f.c);ctx.globalAlpha=1;return f.t<.5}
